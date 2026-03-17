@@ -1,9 +1,9 @@
+import os
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
 items = []
-unused_var = "this will fail flake8"
 
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="en">
