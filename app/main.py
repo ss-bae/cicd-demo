@@ -17,8 +17,31 @@ INDEX_HTML = """<!DOCTYPE html>
       background: #0d1117;
       color: #e6edf3;
       min-height: 100vh;
-      padding: 48px 24px;
+      padding: 0;
     }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #21262d;
+      background: #161b22;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #56d364;
+      box-shadow: 0 0 6px #56d364;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .status-text { font-size: 0.9rem; font-weight: 600; color: #56d364; }
+    .status-label { font-size: 0.9rem; color: #8b949e; }
+    .content { padding: 48px 24px; }
     h1 {
       font-size: 1.8rem;
       font-weight: 700;
@@ -117,6 +140,12 @@ INDEX_HTML = """<!DOCTYPE html>
   </style>
 </head>
 <body>
+  <div class="status-bar">
+    <div class="dot"></div>
+    <span class="status-text">healthy</span>
+    <span class="status-label">&mdash; all systems operational</span>
+  </div>
+  <div class="content">
   <h1>CI/CD Pipeline Demo</h1>
   <p class="subtitle">How code goes from a local change to a live deployment</p>
 
@@ -214,85 +243,8 @@ INDEX_HTML = """<!DOCTYPE html>
 
   <div class="links" style="margin-top: 40px;">
     <a href="https://github.com/ss-bae/cicd-demo" target="_blank">GitHub Repo &rarr;</a>
-    <a href="/health">Health Check &rarr;</a>
     <a href="/items">Items API &rarr;</a>
   </div>
-</body>
-</html>"""
-
-HEALTH_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Health</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      min-height: 100vh;
-    }
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 20px;
-      border-bottom: 1px solid #21262d;
-      background: #161b22;
-    }
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #56d364;
-      box-shadow: 0 0 6px #56d364;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .status-text {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #56d364;
-    }
-    .status-label {
-      font-size: 0.9rem;
-      color: #8b949e;
-    }
-    .body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: calc(100vh - 53px);
-      flex-direction: column;
-      gap: 8px;
-    }
-    .big-dot {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: #56d364;
-      box-shadow: 0 0 32px #56d36466;
-      animation: pulse 2s infinite;
-    }
-    h2 { font-size: 1.4rem; color: #f0f6fc; margin-top: 16px; }
-    p { color: #8b949e; font-size: 0.9rem; }
-  </style>
-</head>
-<body>
-  <div class="status-bar">
-    <div class="dot"></div>
-    <span class="status-text">healthy</span>
-    <span class="status-label">&mdash; all systems operational</span>
-  </div>
-  <div class="body">
-    <div class="big-dot"></div>
-    <h2>All Systems Operational</h2>
-    <p>cicd-demo is running normally</p>
   </div>
 </body>
 </html>"""
@@ -305,7 +257,7 @@ def index():
 
 @app.route("/health")
 def health():
-    return HEALTH_HTML
+    return jsonify({"status": "healthy"})
 
 
 @app.route("/items", methods=["GET"])
