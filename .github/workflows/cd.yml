@@ -13,7 +13,15 @@ jobs:
         run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
 
       - name: Wait for deploy
-        run: sleep 30
-
-      - name: Health check
-        run: curl --fail https://cicd-demo-iqf1.onrender.com/health
+        run: |
+          echo "Waiting for Render to deploy..."
+          for i in $(seq 1 20); do
+            sleep 15
+            if curl --silent --fail https://cicd-demo-iqf1.onrender.com/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i/20 failed, retrying..."
+          done
+          echo "Health check timed out after 5 minutes"
+          exit 1
