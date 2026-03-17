@@ -16,4 +16,4 @@ jobs:
         run: sleep 30
 
       - name: Health check
-        run: curl --fail https://your-app.onrender.com/health
+        run: curl --fail https://cicd-demo-iqf1.onrender.com/health
