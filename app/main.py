@@ -1,8 +1,134 @@
+import base64
+import json
+import os
+import time
+from urllib.error import HTTPError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
 items = []
+
+REPO = "ss-bae/cicd-demo"
+GH_API = "https://api.github.com"
+
+
+def gh(path, method="GET", data=None):
+    token = os.environ.get("GITHUB_TOKEN", "")
+    body = json.dumps(data).encode() if data else None
+    req = Request(
+        GH_API + path,
+        data=body,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urlopen(req, timeout=10) as r:
+            raw = r.read()
+            return (json.loads(raw) if raw else {}), r.status
+    except HTTPError as e:
+        raw = e.read()
+        return (json.loads(raw) if raw else {}), e.code
+
+
+@app.route("/demo/trigger", methods=["POST"])
+def demo_trigger():
+    if not os.environ.get("GITHUB_TOKEN"):
+        return jsonify({"error": "GITHUB_TOKEN not configured"}), 500
+
+    # Get main branch SHA
+    ref, status = gh(f"/repos/{REPO}/git/refs/heads/main")
+    if status != 200:
+        return jsonify({"error": "Could not get main SHA"}), 500
+    main_sha = ref["object"]["sha"]
+
+    # Create demo branch
+    branch = f"demo/run-{int(time.time())}"
+    _, status = gh(
+        f"/repos/{REPO}/git/refs",
+        method="POST",
+        data={"ref": f"refs/heads/{branch}", "sha": main_sha},
+    )
+    if status != 201:
+        return jsonify({"error": "Could not create branch"}), 500
+
+    # Get current demo_run.txt SHA if it exists
+    file_data, file_status = gh(f"/repos/{REPO}/contents/demo_run.txt?ref=main")
+
+    # Push a commit to trigger CI
+    content = base64.b64encode(f"demo run: {branch}\n".encode()).decode()
+    payload = {
+        "message": f"demo: trigger CI [{branch}]",
+        "content": content,
+        "branch": branch,
+    }
+    if file_status == 200:
+        payload["sha"] = file_data["sha"]
+
+    _, status = gh(
+        f"/repos/{REPO}/contents/demo_run.txt",
+        method="PUT",
+        data=payload,
+    )
+    if status not in (200, 201):
+        return jsonify({"error": "Could not push commit"}), 500
+
+    return jsonify({"branch": branch})
+
+
+@app.route("/demo/status/<path:branch>")
+def demo_status(branch):
+    if not os.environ.get("GITHUB_TOKEN"):
+        return jsonify({"error": "GITHUB_TOKEN not configured"}), 500
+
+    encoded = quote(branch, safe="")
+    runs_data, _ = gh(f"/repos/{REPO}/actions/runs?branch={encoded}&per_page=1")
+    runs = runs_data.get("workflow_runs", [])
+    if not runs:
+        return jsonify({"phase": "pending"})
+
+    run = runs[0]
+    run_id = run["id"]
+    run_status = run["status"]
+    run_conclusion = run.get("conclusion")
+
+    jobs_data, _ = gh(f"/repos/{REPO}/actions/runs/{run_id}/jobs")
+    jobs = jobs_data.get("jobs", [])
+    steps = {}
+    if jobs:
+        for step in jobs[0].get("steps", []):
+            steps[step["name"]] = {
+                "status": step["status"],
+                "conclusion": step.get("conclusion"),
+            }
+
+    branch_deleted = False
+    if run_status == "completed":
+        gh(
+            f"/repos/{REPO}/git/refs/heads/{branch}",
+            method="DELETE",
+        )
+        branch_deleted = True
+
+    return jsonify(
+        {
+            "phase": run_status,
+            "run_id": run_id,
+            "run_url": run["html_url"],
+            "conclusion": run_conclusion,
+            "steps": steps,
+            "branch_deleted": branch_deleted,
+        }
+    )
+
 
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -14,16 +140,11 @@ INDEX_HTML = """<!DOCTYPE html>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      min-height: 100vh;
+      background: #0d1117; color: #e6edf3; min-height: 100vh;
     }
     .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 20px;
-      border-bottom: 1px solid #21262d;
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 20px; border-bottom: 1px solid #21262d;
       background: #161b22;
     }
     .dot {
@@ -32,8 +153,7 @@ INDEX_HTML = """<!DOCTYPE html>
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
     }
     .status-text { font-size: .9rem; font-weight: 600; color: #56d364; }
     .status-label { font-size: .9rem; color: #8b949e; }
@@ -47,10 +167,8 @@ INDEX_HTML = """<!DOCTYPE html>
       margin-bottom: 40px; font-size: .95rem;
     }
     .main-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
-      margin-bottom: 48px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 40px; margin-bottom: 48px;
     }
     .step { display: flex; align-items: flex-start; gap: 16px; }
     .step-left {
@@ -72,9 +190,7 @@ INDEX_HTML = """<!DOCTYPE html>
       margin-bottom: 4px; color: #f0f6fc;
     }
     .step-desc { font-size: .85rem; color: #8b949e; line-height: 1.5; }
-    .step-tags {
-      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
-    }
+    .step-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .tag {
       background: #161b22; border: 1px solid #30363d;
       border-radius: 4px; padding: 2px 8px;
@@ -84,74 +200,73 @@ INDEX_HTML = """<!DOCTYPE html>
     .cd   .step-icon { background: #1a3a2a; color: #56d364; }
     .live .step-icon { background: #3a2a1a; color: #ffa657; }
     .dev  .step-icon { background: #2a1a3a; color: #d2a8ff; }
-    .anim-panel {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+    /* Demo panel */
+    .demo-panel {
       background: #161b22; border: 1px solid #21262d;
-      border-radius: 12px; padding: 32px 24px;
+      border-radius: 12px; padding: 24px;
+      display: flex; flex-direction: column; gap: 20px;
     }
-    .anim-title {
-      font-size: .8rem; color: #8b949e;
-      text-transform: uppercase; letter-spacing: .08em;
-      margin-bottom: 28px;
+    .run-btn {
+      width: 100%; padding: 12px; border: none; border-radius: 8px;
+      background: #238636; color: #fff;
+      font-size: .95rem; font-weight: 600;
+      cursor: pointer; transition: background .2s;
     }
-    .anim-track {
-      display: flex; flex-direction: column;
-      align-items: stretch; width: 100%;
+    .run-btn:hover { background: #2ea043; }
+    .run-btn:disabled {
+      background: #21262d; color: #484f58; cursor: not-allowed;
     }
-    .anim-node {
-      display: flex; align-items: center; gap: 14px;
-      width: 100%; padding: 12px 16px;
-      border-radius: 8px; border: 1px solid #30363d;
-      background: #0d1117; transition: all .4s ease;
+    .d-steps { display: flex; flex-direction: column; }
+    .d-step { display: flex; align-items: flex-start; gap: 12px; }
+    .d-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #30363d; margin-top: 5px; flex-shrink: 0;
+      transition: all .3s;
     }
-    .anim-node.active {
-      border-color: var(--color);
-      background: var(--bg);
-      box-shadow: 0 0 16px var(--glow);
+    .d-dot.running {
+      background: #58a6ff; box-shadow: 0 0 8px #58a6ff;
+      animation: pulse .8s infinite;
     }
-    .anim-icon {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; background: #21262d;
-      transition: background .4s ease; flex-shrink: 0;
-    }
-    .anim-node.active .anim-icon { background: var(--bg-icon); }
-    .anim-label { flex: 1; }
-    .anim-step-num {
+    .d-dot.success { background: #56d364; box-shadow: 0 0 6px #56d364; }
+    .d-dot.failure { background: #f85149; box-shadow: 0 0 6px #f85149; }
+    .d-dot.locked { background: #21262d; }
+    .d-body { flex: 1; padding-bottom: 4px; }
+    .d-label { display: flex; gap: 8px; align-items: baseline; }
+    .d-num {
       font-size: .7rem; color: #8b949e;
       text-transform: uppercase; letter-spacing: .06em;
-      transition: color .4s ease;
     }
-    .anim-node.active .anim-step-num { color: var(--color); }
-    .anim-name {
-      font-size: .9rem; font-weight: 600;
-      color: #484f58; transition: color .4s ease;
+    .d-name { font-size: .9rem; font-weight: 600; color: #e6edf3; }
+    .d-st {
+      font-size: .8rem; color: #8b949e;
+      margin-top: 2px; min-height: 18px;
     }
-    .anim-node.active .anim-name { color: #f0f6fc; }
-    .anim-connector {
-      width: 2px; height: 24px; background: #21262d;
-      position: relative; margin: 0 auto;
+    .d-st.ok { color: #56d364; }
+    .d-st.fail { color: #f85149; }
+    .d-st.run { color: #58a6ff; }
+    .d-st.lock { color: #484f58; }
+    .d-conn {
+      width: 2px; height: 16px; background: #21262d; margin-left: 5px;
     }
-    .signal-dot {
+    .d-subs { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+    .d-sub { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
+    .s-dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: #58a6ff; position: absolute;
-      left: 50%; transform: translateX(-50%); opacity: 0;
+      background: #30363d; flex-shrink: 0; transition: all .3s;
     }
-    .signal-dot.go { animation: travel .7s ease-in forwards; }
-    @keyframes travel {
-      0%   { top: 0; opacity: 1; }
-      100% { top: 24px; opacity: 0; }
+    .s-dot.run { background: #58a6ff; animation: pulse .8s infinite; }
+    .s-dot.ok  { background: #56d364; }
+    .s-dot.fail { background: #f85149; }
+    .s-name { color: #8b949e; flex: 1; }
+    .s-res { color: #8b949e; font-family: monospace; }
+    .s-res.ok { color: #56d364; }
+    .s-res.fail { color: #f85149; }
+    .s-res.run { color: #58a6ff; }
+    .gh-link {
+      font-size: .8rem; color: #58a6ff;
+      text-decoration: none; text-align: center;
     }
-    .api-demo {
-      border: 1px solid #21262d; border-radius: 12px;
-      background: #161b22; padding: 28px; margin-bottom: 32px;
-    }
-    .api-demo h3 {
-      font-size: 1rem; font-weight: 600;
-      color: #f0f6fc; margin-bottom: 4px;
-    }
-    .api-desc { font-size: .85rem; color: #8b949e; margin-bottom: 20px; }
+    .gh-link:hover { text-decoration: underline; }
     .links { display: flex; gap: 16px; justify-content: center; }
     .links a { color: #58a6ff; font-size: .85rem; text-decoration: none; }
     .links a:hover { text-decoration: underline; }
@@ -266,79 +381,102 @@ INDEX_HTML = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- RIGHT: Animation -->
-      <div class="anim-panel">
-        <div class="anim-title">Pipeline in action</div>
-        <div class="anim-track">
+      <!-- RIGHT: Live demo panel -->
+      <div class="demo-panel">
+        <button class="run-btn" id="run-btn" onclick="runDemo()">
+          &#x25B6;&nbsp; Run Pipeline Demo
+        </button>
 
-          <div class="anim-node" id="anim-0"
-            style="--color:#d2a8ff;--bg:#2a1a3a;
-                   --bg-icon:#3d2657;--glow:#d2a8ff33">
-            <div class="anim-icon">&#x270F;</div>
-            <div class="anim-label">
-              <div class="anim-step-num">Step 1</div>
-              <div class="anim-name">Push Code</div>
+        <div class="d-steps">
+
+          <div class="d-step">
+            <div class="d-dot" id="d-dot-1"></div>
+            <div class="d-body">
+              <div class="d-label">
+                <span class="d-num">Step 1</span>
+                <span class="d-name">Push Code</span>
+              </div>
+              <div class="d-st" id="d-st-1">&mdash;</div>
             </div>
           </div>
+          <div class="d-conn"></div>
 
-          <div class="anim-connector">
-            <div class="signal-dot" id="sig-0"></div>
-          </div>
-
-          <div class="anim-node" id="anim-1"
-            style="--color:#79c0ff;--bg:#1f3a6e;
-                   --bg-icon:#2a4a8e;--glow:#79c0ff33">
-            <div class="anim-icon">&#x2699;</div>
-            <div class="anim-label">
-              <div class="anim-step-num">Step 2</div>
-              <div class="anim-name">CI Runs</div>
+          <div class="d-step">
+            <div class="d-dot" id="d-dot-2"></div>
+            <div class="d-body">
+              <div class="d-label">
+                <span class="d-num">Step 2</span>
+                <span class="d-name">CI Runs</span>
+              </div>
+              <div class="d-st" id="d-st-2">&mdash;</div>
+              <div class="d-subs">
+                <div class="d-sub">
+                  <div class="s-dot" id="s-dot-flake8"></div>
+                  <span class="s-name">flake8 lint</span>
+                  <span class="s-res" id="s-res-flake8">&mdash;</span>
+                </div>
+                <div class="d-sub">
+                  <div class="s-dot" id="s-dot-black"></div>
+                  <span class="s-name">black format</span>
+                  <span class="s-res" id="s-res-black">&mdash;</span>
+                </div>
+                <div class="d-sub">
+                  <div class="s-dot" id="s-dot-pytest"></div>
+                  <span class="s-name">pytest</span>
+                  <span class="s-res" id="s-res-pytest">&mdash;</span>
+                </div>
+              </div>
             </div>
           </div>
+          <div class="d-conn"></div>
 
-          <div class="anim-connector">
-            <div class="signal-dot" id="sig-1"></div>
-          </div>
-
-          <div class="anim-node" id="anim-2"
-            style="--color:#79c0ff;--bg:#1f3a6e;
-                   --bg-icon:#2a4a8e;--glow:#79c0ff33">
-            <div class="anim-icon">&#x1F512;</div>
-            <div class="anim-label">
-              <div class="anim-step-num">Step 3</div>
-              <div class="anim-name">Branch Protection</div>
+          <div class="d-step">
+            <div class="d-dot" id="d-dot-3"></div>
+            <div class="d-body">
+              <div class="d-label">
+                <span class="d-num">Step 3</span>
+                <span class="d-name">Branch Protection</span>
+              </div>
+              <div class="d-st" id="d-st-3">&mdash;</div>
             </div>
           </div>
+          <div class="d-conn"></div>
 
-          <div class="anim-connector">
-            <div class="signal-dot" id="sig-2"></div>
-          </div>
-
-          <div class="anim-node" id="anim-3"
-            style="--color:#56d364;--bg:#1a3a2a;
-                   --bg-icon:#1f4a35;--glow:#56d36433">
-            <div class="anim-icon">&#x1F680;</div>
-            <div class="anim-label">
-              <div class="anim-step-num">Step 4</div>
-              <div class="anim-name">CD Deploys</div>
+          <div class="d-step">
+            <div class="d-dot locked"></div>
+            <div class="d-body">
+              <div class="d-label">
+                <span class="d-num">Step 4</span>
+                <span class="d-name">CD Deploy</span>
+              </div>
+              <div class="d-st lock">
+                &#x1F512; only on merge to main
+              </div>
             </div>
           </div>
+          <div class="d-conn"></div>
 
-          <div class="anim-connector">
-            <div class="signal-dot" id="sig-3"></div>
-          </div>
-
-          <div class="anim-node" id="anim-4"
-            style="--color:#ffa657;--bg:#3a2a1a;
-                   --bg-icon:#4a3520;--glow:#ffa65733">
-            <div class="anim-icon">&#x2665;</div>
-            <div class="anim-label">
-              <div class="anim-step-num">Step 5</div>
-              <div class="anim-name">Health Check</div>
+          <div class="d-step">
+            <div class="d-dot locked"></div>
+            <div class="d-body">
+              <div class="d-label">
+                <span class="d-num">Step 5</span>
+                <span class="d-name">Health Check</span>
+              </div>
+              <div class="d-st lock">
+                &#x1F512; only on merge to main
+              </div>
             </div>
           </div>
 
         </div>
+
+        <a class="gh-link" id="gh-link" href="#"
+           target="_blank" style="display:none">
+          View on GitHub Actions &rarr;
+        </a>
       </div>
+
     </div>
 
     <div class="links">
@@ -349,26 +487,114 @@ INDEX_HTML = """<!DOCTYPE html>
   </div>
 
   <script>
-    // Animation
-    const STEPS = 5;
-    let current = 0;
+    let pollTimer = null;
+    let currentBranch = null;
 
-    function tick() {
-      for (let i = 0; i < STEPS; i++) {
-        document.getElementById('anim-' + i).classList.remove('active');
+    async function runDemo() {
+      const btn = document.getElementById('run-btn');
+      btn.disabled = true;
+      clearInterval(pollTimer);
+      reset();
+      setStep(1, 'running', 'pushing branch...');
+      try {
+        const res = await fetch('/demo/trigger', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+          setStep(1, 'failure', data.error);
+          btn.disabled = false;
+          return;
+        }
+        currentBranch = data.branch;
+        setStep(1, 'success', 'branch created \u2713');
+        setStep(2, 'running', 'waiting for runner...');
+        pollTimer = setInterval(poll, 3000);
+      } catch (e) {
+        setStep(1, 'failure', 'network error');
+        btn.disabled = false;
       }
-      document.getElementById('anim-' + current).classList.add('active');
-      if (current < STEPS - 1) {
-        const dot = document.getElementById('sig-' + current);
-        dot.classList.remove('go');
-        void dot.offsetWidth;
-        dot.classList.add('go');
-      }
-      current = (current + 1) % STEPS;
     }
 
-    tick();
-    setInterval(tick, 1600);
+    async function poll() {
+      if (!currentBranch) return;
+      try {
+        const res = await fetch('/demo/status/' + currentBranch);
+        const data = await res.json();
+        apply(data);
+        if (data.phase === 'completed' || data.branch_deleted) {
+          clearInterval(pollTimer);
+          document.getElementById('run-btn').disabled = false;
+        }
+      } catch (e) { /* keep polling */ }
+    }
+
+    const STEP_MAP = {
+      'Lint with flake8': 'flake8',
+      'Check formatting with black': 'black',
+      'Run tests with coverage': 'pytest',
+    };
+
+    function apply(data) {
+      if (data.phase === 'pending') {
+        setStep(2, 'running', 'waiting for runner...');
+        return;
+      }
+      if (data.run_url) {
+        const lnk = document.getElementById('gh-link');
+        lnk.href = data.run_url;
+        lnk.style.display = '';
+      }
+      for (const [name, key] of Object.entries(STEP_MAP)) {
+        const s = data.steps[name];
+        if (!s) continue;
+        const state = s.conclusion === 'success' ? 'ok'
+          : s.conclusion === 'failure' ? 'fail'
+          : s.status === 'in_progress' ? 'run' : '';
+        const label = s.conclusion === 'success' ? '\u2713'
+          : s.conclusion === 'failure' ? '\u2717'
+          : s.status === 'in_progress' ? '...' : '\u2014';
+        setSub(key, state, label);
+      }
+      if (data.phase === 'in_progress') {
+        setStep(2, 'running', 'running checks...');
+      } else if (data.phase === 'completed') {
+        if (data.conclusion === 'success') {
+          setStep(2, 'success', 'all checks passed \u2713');
+          setStep(3, 'success', 'CI passed \u2014 merge unblocked \u2713');
+        } else {
+          setStep(2, 'failure', 'a check failed \u2717');
+          setStep(3, 'failure', 'CI failed \u2014 merge blocked \u2717');
+        }
+      }
+    }
+
+    function setStep(n, state, text) {
+      const dot = document.getElementById('d-dot-' + n);
+      const st = document.getElementById('d-st-' + n);
+      dot.className = 'd-dot ' + state;
+      st.textContent = text;
+      st.className = 'd-st'
+        + (state === 'success' ? ' ok'
+          : state === 'failure' ? ' fail'
+          : state === 'running' ? ' run' : '');
+    }
+
+    function setSub(key, state, label) {
+      const dot = document.getElementById('s-dot-' + key);
+      const res = document.getElementById('s-res-' + key);
+      dot.className = 's-dot ' + state;
+      res.textContent = label;
+      res.className = 's-res ' + state;
+    }
+
+    function reset() {
+      for (let i = 1; i <= 3; i++) {
+        setStep(i, '', '\u2014');
+      }
+      ['flake8', 'black', 'pytest'].forEach(k => setSub(k, '', '\u2014'));
+      const lnk = document.getElementById('gh-link');
+      lnk.style.display = 'none';
+      lnk.href = '#';
+    }
   </script>
 </body>
 </html>"""

@@ -64,3 +64,15 @@ def test_add_multiple_items(client):
     data = response.get_json()
     assert len(data["items"]) == 2
     assert data["items"][1]["id"] == 2
+
+
+def test_demo_trigger_no_token(client):
+    response = client.post("/demo/trigger")
+    assert response.status_code == 500
+    assert b"GITHUB_TOKEN" in response.data
+
+
+def test_demo_status_no_token(client):
+    response = client.get("/demo/status/demo/run-123")
+    assert response.status_code == 500
+    assert b"GITHUB_TOKEN" in response.data
