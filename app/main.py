@@ -152,43 +152,6 @@ INDEX_HTML = """<!DOCTYPE html>
       color: #f0f6fc; margin-bottom: 4px;
     }
     .api-desc { font-size: .85rem; color: #8b949e; margin-bottom: 20px; }
-    .api-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
-    .api-input {
-      flex: 1; background: #0d1117; border: 1px solid #30363d;
-      border-radius: 6px; padding: 10px 14px;
-      color: #e6edf3; font-size: .9rem; outline: none;
-    }
-    .api-input:focus { border-color: #58a6ff; }
-    .api-btn {
-      background: #238636; border: none; border-radius: 6px;
-      padding: 10px 20px; color: #fff;
-      font-size: .9rem; font-weight: 600;
-      cursor: pointer; transition: background .2s;
-    }
-    .api-btn:hover { background: #2ea043; }
-    .api-btn:disabled {
-      background: #21262d; color: #484f58; cursor: not-allowed;
-    }
-    .items-list { display: flex; flex-direction: column; gap: 8px; }
-    .item-row {
-      display: flex; align-items: center; gap: 12px;
-      background: #0d1117; border: 1px solid #21262d;
-      border-radius: 6px; padding: 10px 14px;
-      animation: fadeIn .3s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-4px); }
-      to { opacity: 1; }
-    }
-    .item-id {
-      font-size: .75rem; color: #8b949e;
-      font-family: monospace; min-width: 40px;
-    }
-    .item-name { font-size: .9rem; color: #e6edf3; }
-    .empty-state { color: #484f58; font-size: .85rem; font-style: italic; }
-    .api-status { font-size: .8rem; color: #8b949e; margin-top: 8px; }
-    .api-status.ok { color: #56d364; }
-    .api-status.err { color: #f85149; }
     .links { display: flex; gap: 16px; justify-content: center; }
     .links a { color: #58a6ff; font-size: .85rem; text-decoration: none; }
     .links a:hover { text-decoration: underline; }
@@ -378,38 +341,10 @@ INDEX_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Items API Demo -->
-    <div class="api-demo">
-      <h3>Try the Items API live</h3>
-      <p class="api-desc">
-        POST and GET requests hit the real Flask backend &mdash;
-        deployed automatically by the pipeline above.
-      </p>
-      <div class="api-input-row">
-        <input
-          class="api-input"
-          id="item-input"
-          type="text"
-          placeholder="Enter an item name..."
-          maxlength="60"
-        />
-        <button class="api-btn" id="add-btn" onclick="addItem()">
-          Add
-        </button>
-      </div>
-      <div class="items-list" id="items-list">
-        <div class="empty-state" id="empty-msg">
-          No items yet &mdash; add one above.
-        </div>
-      </div>
-      <div class="api-status" id="api-status"></div>
-    </div>
-
     <div class="links">
       <a href="https://github.com/ss-bae/cicd-demo" target="_blank">
         GitHub Repo &rarr;
       </a>
-      <a href="/items">Items API &rarr;</a>
     </div>
   </div>
 
@@ -434,78 +369,6 @@ INDEX_HTML = """<!DOCTYPE html>
 
     tick();
     setInterval(tick, 1600);
-
-    // Items API
-    function setStatus(msg, type) {
-      const el = document.getElementById('api-status');
-      el.textContent = msg;
-      el.className = 'api-status ' + (type || '');
-    }
-
-    async function loadItems() {
-      try {
-        const res = await fetch('/items');
-        const data = await res.json();
-        renderItems(data.items);
-      } catch (e) {
-        setStatus('Could not reach API', 'err');
-      }
-    }
-
-    function escHtml(str) {
-      return str.replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-    }
-
-    function renderItems(its) {
-      const list = document.getElementById('items-list');
-      const empty = document.getElementById('empty-msg');
-      list.querySelectorAll('.item-row').forEach(r => r.remove());
-      if (!its.length) { empty.style.display = ''; return; }
-      empty.style.display = 'none';
-      its.forEach(item => {
-        const row = document.createElement('div');
-        row.className = 'item-row';
-        row.innerHTML =
-          '<span class="item-id">id: ' + item.id + '</span>' +
-          '<span class="item-name">' + escHtml(item.name) + '</span>';
-        list.appendChild(row);
-      });
-    }
-
-    async function addItem() {
-      const input = document.getElementById('item-input');
-      const btn = document.getElementById('add-btn');
-      const name = input.value.trim();
-      if (!name) return;
-      btn.disabled = true;
-      setStatus('Adding...', '');
-      try {
-        const res = await fetch('/items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
-        });
-        if (!res.ok) throw new Error('bad response');
-        input.value = '';
-        setStatus('Added!', 'ok');
-        await loadItems();
-        setTimeout(() => setStatus('', ''), 2000);
-      } catch (e) {
-        setStatus('Error adding item', 'err');
-      } finally {
-        btn.disabled = false;
-        input.focus();
-      }
-    }
-
-    document.getElementById('item-input')
-      .addEventListener('keydown', e => {
-        if (e.key === 'Enter') addItem();
-      });
-
-    loadItems();
   </script>
 </body>
 </html>"""
