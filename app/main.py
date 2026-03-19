@@ -281,10 +281,23 @@ INDEX_HTML = """<!DOCTYPE html>
       padding: 10px 16px; background: #161b22;
       border-bottom: 1px solid #21262d; flex-shrink: 0;
     }
-    .log-title { font-size: .78rem; font-weight: 600; color: #8b949e; letter-spacing: .04em; }
-    .log-body { flex: 1; padding: 6px 0; overflow-y: auto; font-family: 'SF Mono', Consolas, 'Liberation Mono', monospace; }
-    .log-placeholder { padding: 48px 16px; text-align: center; color: #484f58; font-size: .85rem; font-family: -apple-system, sans-serif; }
-    .log-row { display: flex; align-items: center; gap: 10px; padding: 3px 16px; font-size: .78rem; line-height: 1.7; cursor: default; }
+    .log-title {
+      font-size: .78rem; font-weight: 600;
+      color: #8b949e; letter-spacing: .04em;
+    }
+    .log-body {
+      flex: 1; padding: 6px 0; overflow-y: auto;
+      font-family: 'SF Mono', Consolas, 'Liberation Mono', monospace;
+    }
+    .log-placeholder {
+      padding: 48px 16px; text-align: center; color: #484f58;
+      font-size: .85rem; font-family: -apple-system, sans-serif;
+    }
+    .log-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 3px 16px; font-size: .78rem;
+      line-height: 1.7; cursor: default;
+    }
     .log-row:hover { background: #161b22; }
     .log-icon { width: 14px; flex-shrink: 0; text-align: center; font-size: .75rem; }
     .log-icon.ok { color: #56d364; }
@@ -563,7 +576,8 @@ INDEX_HTML = """<!DOCTYPE html>
       lnk.style.display = 'none';
       lnk.href = '#';
       const logBody = document.getElementById('log-body');
-      logBody.innerHTML = '<div class="log-placeholder">Run the demo to see live logs</div>';
+      logBody.innerHTML =
+        '<div class="log-placeholder">Run the demo to see live logs</div>';
     }
   </script>
 </body>
