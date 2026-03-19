@@ -19,7 +19,7 @@ def client():
 def test_index(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert b"CI/CD Pipeline Demo" in response.data
+    assert b"CI/CD Demo" in response.data
 
 
 def test_health(client):

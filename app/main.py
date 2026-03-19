@@ -135,451 +135,598 @@ INDEX_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CI/CD Pipeline Demo</title>
+  <title>CI/CD Demo</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+    }
+    :root {
+      --bg:      #0c1017;
+      --surface: #111827;
+      --border:  rgba(255,255,255,.07);
+      --text:    #e2e8f0;
+      --muted:   #6b7280;
+      --dim:     #374151;
+      --blue:    #3b82f6;
+      --green:   #10b981;
+      --red:     #ef4444;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d1117; color: #e6edf3; min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont,
+        'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; line-height: 1.5;
     }
-    .status-bar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 14px 20px; border-bottom: 1px solid #21262d;
-      background: #161b22;
+
+    /* Nav */
+    nav {
+      height: 52px; padding: 0 24px;
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(12,16,23,.88);
+      backdrop-filter: blur(10px);
+      position: sticky; top: 0; z-index: 10;
     }
-    .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: #56d364; box-shadow: 0 0 6px #56d364;
-      animation: pulse 2s infinite;
+    .brand {
+      display: flex; align-items: center; gap: 9px;
+      font-weight: 600; font-size: .88rem; color: var(--text);
+      text-decoration: none; flex: 1; letter-spacing: -.01em;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+    .brand-mark {
+      width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
     }
-    .status-text { font-size: .9rem; font-weight: 600; color: #56d364; }
-    .status-label { font-size: .9rem; color: #8b949e; }
-    .content { padding: 40px 24px; max-width: 1100px; margin: 0 auto; }
-    h1 {
-      font-size: 1.8rem; font-weight: 700;
-      text-align: center; margin-bottom: 8px; color: #f0f6fc;
+    .nav-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 20px;
+      background: rgba(16,185,129,.08);
+      border: 1px solid rgba(16,185,129,.18);
+      font-size: .72rem; font-weight: 500; color: var(--green);
     }
-    .subtitle {
-      text-align: center; color: #8b949e;
-      margin-bottom: 40px; font-size: .95rem;
-    }
-    .main-layout {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 40px; margin-bottom: 48px;
-    }
-    .step { display: flex; align-items: flex-start; gap: 16px; }
-    .step-left {
-      display: flex; flex-direction: column;
-      align-items: center; flex-shrink: 0; width: 40px;
-    }
-    .step-icon {
-      width: 40px; height: 40px; border-radius: 50%;
-      display: flex; align-items: center;
-      justify-content: center; font-size: 1.1rem;
-    }
-    .step-line {
-      width: 2px; flex: 1; min-height: 24px;
-      background: #30363d; margin: 4px 0;
-    }
-    .step-body { padding-bottom: 28px; flex: 1; }
-    .step-title {
-      font-weight: 600; font-size: .95rem;
-      margin-bottom: 4px; color: #f0f6fc;
-    }
-    .step-desc { font-size: .85rem; color: #8b949e; line-height: 1.5; }
-    .step-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .tag {
-      background: #161b22; border: 1px solid #30363d;
-      border-radius: 4px; padding: 2px 8px;
-      font-size: .75rem; color: #8b949e; font-family: monospace;
-    }
-    .ci   .step-icon { background: #1f3a6e; color: #79c0ff; }
-    .cd   .step-icon { background: #1a3a2a; color: #56d364; }
-    .live .step-icon { background: #3a2a1a; color: #ffa657; }
-    .dev  .step-icon { background: #2a1a3a; color: #d2a8ff; }
-    /* Demo panel */
-    .demo-panel {
-      background: #161b22; border: 1px solid #21262d;
-      border-radius: 12px; padding: 24px;
-      display: flex; flex-direction: column; gap: 20px;
-    }
-    .run-btn {
-      width: 100%; padding: 12px; border: none; border-radius: 8px;
-      background: #238636; color: #fff;
-      font-size: .95rem; font-weight: 600;
-      cursor: pointer; transition: background .2s;
-    }
-    .run-btn:hover { background: #2ea043; }
-    .run-btn:disabled {
-      background: #21262d; color: #484f58; cursor: not-allowed;
-    }
-    .d-steps { display: flex; flex-direction: column; }
-    .d-step { display: flex; align-items: flex-start; gap: 12px; }
-    .d-dot {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: #30363d; margin-top: 5px; flex-shrink: 0;
-      transition: all .3s;
-    }
-    .d-dot.running {
-      background: #58a6ff; box-shadow: 0 0 8px #58a6ff;
-      animation: pulse .8s infinite;
-    }
-    .d-dot.success { background: #56d364; box-shadow: 0 0 6px #56d364; }
-    .d-dot.failure { background: #f85149; box-shadow: 0 0 6px #f85149; }
-    .d-dot.locked { background: #21262d; }
-    .d-body { flex: 1; padding-bottom: 4px; }
-    .d-label { display: flex; gap: 8px; align-items: baseline; }
-    .d-num {
-      font-size: .7rem; color: #8b949e;
-      text-transform: uppercase; letter-spacing: .06em;
-    }
-    .d-name { font-size: .9rem; font-weight: 600; color: #e6edf3; }
-    .d-st {
-      font-size: .8rem; color: #8b949e;
-      margin-top: 2px; min-height: 18px;
-    }
-    .d-st.ok { color: #56d364; }
-    .d-st.fail { color: #f85149; }
-    .d-st.run { color: #58a6ff; }
-    .d-st.lock { color: #484f58; }
-    .d-conn {
-      width: 2px; height: 16px; background: #21262d; margin-left: 5px;
-    }
-    .d-subs { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
-    .d-sub { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
-    .s-dot {
+    .nav-pip {
       width: 6px; height: 6px; border-radius: 50%;
-      background: #30363d; flex-shrink: 0; transition: all .3s;
+      background: var(--green); flex-shrink: 0;
+      animation: breathe 3s ease-in-out infinite;
     }
-    .s-dot.run { background: #58a6ff; animation: pulse .8s infinite; }
-    .s-dot.ok  { background: #56d364; }
-    .s-dot.fail { background: #f85149; }
-    .s-name { color: #8b949e; flex: 1; }
-    .s-res { color: #8b949e; font-family: monospace; }
-    .s-res.ok { color: #56d364; }
-    .s-res.fail { color: #f85149; }
-    .s-res.run { color: #58a6ff; }
-    .gh-link {
-      font-size: .75rem; color: #58a6ff;
-      text-decoration: none;
+    @keyframes breathe {
+      0%, 100% { opacity: 1; } 50% { opacity: .35; }
     }
-    .gh-link:hover { text-decoration: underline; }
-    .links { display: flex; gap: 16px; justify-content: center; }
-    .links a { color: #58a6ff; font-size: .85rem; text-decoration: none; }
-    .links a:hover { text-decoration: underline; }
+    .nav-link {
+      font-size: .8rem; color: var(--muted); text-decoration: none;
+      padding: 4px 8px; border-radius: 6px; transition: all .15s;
+    }
+    .nav-link:hover { color: var(--text); background: var(--border); }
+
+    /* Page */
+    .page {
+      max-width: 1020px; margin: 0 auto;
+      padding: 44px 24px 72px;
+    }
+    .page-head { margin-bottom: 36px; }
+    .kicker {
+      font-size: .68rem; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--blue); margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 1.85rem; font-weight: 700; line-height: 1.2;
+      letter-spacing: -.03em; color: #f1f5f9; margin-bottom: 8px;
+    }
+    .sub { font-size: .875rem; color: var(--muted); }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 310px 1fr;
+      gap: 20px; align-items: start;
+    }
+
+    /* Panel shell */
+    .panel {
+      border-radius: 12px; border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title {
+      font-size: .68rem; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Demo panel */
+    .demo-panel { background: var(--surface); }
+    .demo-body {
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+
+    .run-btn {
+      width: 100%; padding: 9px 16px; border: none;
+      border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: .84rem; font-weight: 600;
+      color: #fff; letter-spacing: -.01em;
+      background: #1d4ed8;
+      box-shadow:
+        0 1px 3px rgba(0,0,0,.5),
+        inset 0 1px 0 rgba(255,255,255,.07);
+      transition: background .15s, transform .1s, box-shadow .15s;
+      display: flex; align-items: center;
+      justify-content: center; gap: 8px;
+    }
+    .run-btn:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+      box-shadow:
+        0 4px 12px rgba(37,99,235,.35),
+        inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    .run-btn:active { transform: translateY(0); }
+    .run-btn:disabled {
+      background: #1a2234; color: #2d3748;
+      cursor: not-allowed; transform: none; box-shadow: none;
+    }
+
+    /* Pipeline */
+    .pipeline { display: flex; flex-direction: column; }
+    .p-step { display: flex; gap: 12px; }
+    .p-track {
+      display: flex; flex-direction: column;
+      align-items: center; width: 26px; flex-shrink: 0;
+    }
+    .p-node {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 2px solid var(--dim);
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .68rem; font-weight: 600; color: var(--dim);
+      flex-shrink: 0; transition: all .3s; z-index: 1;
+    }
+    .p-node.success {
+      border-color: #065f46; background: #052e16; color: var(--green);
+    }
+    .p-node.failure {
+      border-color: #7f1d1d; background: #2d0a0a; color: var(--red);
+    }
+    .p-node.running {
+      border-color: #3b82f6; background: #1e3a8a;
+      color: #93c5fd; border-top-color: transparent;
+      animation: spin .75s linear infinite;
+    }
+    .p-node.locked {
+      border-color: #1a2234; background: var(--bg); color: #1a2234;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .p-wire {
+      width: 1px; flex: 1; min-height: 12px;
+      background: var(--dim); margin: 3px 0; opacity: .3;
+    }
+    .p-body { flex: 1; padding-bottom: 18px; padding-top: 4px; }
+    .p-name {
+      font-size: .84rem; font-weight: 500;
+      color: #d1d5db; margin-bottom: 1px;
+    }
+    .p-msg {
+      font-size: .74rem; color: var(--dim);
+      min-height: 16px; transition: color .2s;
+    }
+    .p-msg.ok { color: var(--green); }
+    .p-msg.fail { color: var(--red); }
+    .p-msg.run { color: #60a5fa; }
+    .p-msg.lock { color: #1f2937; font-style: italic; }
+
+    /* Sub-steps */
+    .sub-steps {
+      margin-top: 8px; display: flex;
+      flex-direction: column; gap: 4px;
+    }
+    .sub-step {
+      display: flex; align-items: center;
+      gap: 7px; font-size: .75rem;
+    }
+    .s-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--dim); flex-shrink: 0; transition: all .25s;
+    }
+    .s-dot.ok {
+      background: var(--green);
+      box-shadow: 0 0 5px rgba(16,185,129,.5);
+    }
+    .s-dot.fail { background: var(--red); }
+    .s-dot.run {
+      background: #60a5fa; animation: breathe .8s infinite;
+    }
+    .s-label {
+      color: var(--muted); flex: 1;
+      font-family: 'SF Mono', Consolas, monospace;
+    }
+    .s-res {
+      color: var(--dim); font-family: 'SF Mono', Consolas, monospace;
+    }
+    .s-res.ok { color: var(--green); }
+    .s-res.fail { color: var(--red); }
+    .s-res.run { color: #60a5fa; }
+
     /* Log panel */
     .log-panel {
-      background: #0d1117; border: 1px solid #21262d;
-      border-radius: 12px; overflow: hidden;
-      display: flex; flex-direction: column; min-height: 420px;
+      background: #090d14;
+      display: flex; flex-direction: column;
+      font-family: 'SF Mono', 'Cascadia Code',
+        Consolas, 'Liberation Mono', monospace;
     }
-    .log-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 16px; background: #161b22;
-      border-bottom: 1px solid #21262d; flex-shrink: 0;
+    .log-titlebar {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 14px;
+      background: #0f1623;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
-    .log-title {
-      font-size: .78rem; font-weight: 600;
-      color: #8b949e; letter-spacing: .04em;
+    .tl {
+      width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
     }
+    .tl-r { background: #ff5f57; }
+    .tl-y { background: #febc2e; }
+    .tl-g { background: #28c840; }
+    .titlebar-label {
+      flex: 1; text-align: center; font-size: .7rem; color: #2d3748;
+    }
+    .gh-link {
+      font-size: .7rem; color: #2d3748;
+      text-decoration: none; transition: color .15s;
+    }
+    .gh-link:hover { color: #60a5fa; }
     .log-body {
-      flex: 1; padding: 6px 0; overflow-y: auto;
-      font-family: 'SF Mono', Consolas, 'Liberation Mono', monospace;
+      flex: 1; overflow-y: auto;
+      padding: 6px 0; min-height: 370px;
     }
-    .log-placeholder {
-      padding: 48px 16px; text-align: center; color: #484f58;
-      font-size: .85rem; font-family: -apple-system, sans-serif;
+    .log-empty {
+      min-height: 370px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px; color: #1f2937;
+      font-family: -apple-system, sans-serif;
+      font-size: .8rem;
+    }
+    .log-empty-glyph {
+      font-size: 1.5rem; opacity: .4; margin-bottom: 2px;
     }
     .log-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 3px 16px; font-size: .78rem;
-      line-height: 1.7; cursor: default;
+      display: flex; align-items: baseline;
+      gap: 8px; padding: 1px 14px;
+      font-size: .76rem; line-height: 1.9;
     }
-    .log-row:hover { background: #161b22; }
-    .log-icon { width: 14px; flex-shrink: 0; text-align: center; font-size: .75rem; }
-    .log-icon.ok { color: #56d364; }
-    .log-icon.fail { color: #f85149; }
-    .log-icon.run { color: #58a6ff; }
-    .log-icon.queued { color: #484f58; }
-    .log-name { flex: 1; color: #8b949e; }
-    .log-name.run { color: #e6edf3; font-weight: 600; }
-    .log-name.fail { color: #f85149; }
-    @media (max-width: 700px) {
-      .main-layout { grid-template-columns: 1fr; }
+    .log-row:hover { background: rgba(255,255,255,.02); }
+    .log-lno {
+      width: 22px; text-align: right; flex-shrink: 0;
+      color: #1f2937; font-size: .67rem; user-select: none;
+    }
+    .log-ic {
+      width: 13px; text-align: center; flex-shrink: 0; font-size: .7rem;
+    }
+    .log-ic.ok { color: #10b981; }
+    .log-ic.fail { color: #ef4444; }
+    .log-ic.run { color: #60a5fa; }
+    .log-ic.queued { color: #1f2937; }
+    .log-txt { color: #4b5563; }
+    .log-txt.run { color: #d1d5db; font-weight: 500; }
+    .log-txt.fail { color: #fca5a5; }
+
+    /* Footer */
+    .foot {
+      margin-top: 40px; padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 20px;
+    }
+    .foot-link {
+      font-size: .8rem; color: var(--dim);
+      text-decoration: none; transition: color .15s;
+    }
+    .foot-link:hover { color: var(--muted); }
+
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 1.5rem; }
+      .nav-badge span { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="status-bar">
-    <div class="dot"></div>
-    <span class="status-text">healthy</span>
-    <span class="status-label">&mdash; all systems operational</span>
+
+<nav>
+  <a class="brand" href="#">
+    <div class="brand-mark"></div>
+    cicd-demo
+  </a>
+  <div class="nav-badge">
+    <div class="nav-pip"></div>
+    <span>all systems operational</span>
   </div>
-  <div class="content">
-    <h1>CI/CD Pipeline Demo</h1>
-    <p class="subtitle">
-      How code goes from a local change to a live deployment
+  <a class="nav-link"
+     href="https://github.com/ss-bae/cicd-demo"
+     target="_blank">GitHub</a>
+</nav>
+
+<div class="page">
+  <div class="page-head">
+    <div class="kicker">Live Demo</div>
+    <h1>CI/CD Pipeline</h1>
+    <p class="sub">
+      Trigger a real GitHub Actions workflow and watch it run.
     </p>
+  </div>
 
-    <div class="main-layout">
+  <div class="grid">
 
-      <!-- LEFT: Demo panel -->
-      <div class="demo-panel">
+    <!-- Left: pipeline controls -->
+    <div class="panel demo-panel">
+      <div class="panel-head">
+        <span class="panel-title">Pipeline</span>
+      </div>
+      <div class="demo-body">
+
         <button class="run-btn" id="run-btn" onclick="runDemo()">
-          &#x25B6;&nbsp; Run Pipeline Demo
+          &#x25B6; Run Pipeline
         </button>
 
-        <div class="d-steps">
+        <div class="pipeline">
 
-          <div class="d-step">
-            <div class="d-dot" id="d-dot-1"></div>
-            <div class="d-body">
-              <div class="d-label">
-                <span class="d-num">Step 1</span>
-                <span class="d-name">Push Code</span>
-              </div>
-              <div class="d-st" id="d-st-1">&mdash;</div>
+          <div class="p-step">
+            <div class="p-track">
+              <div class="p-node" id="d-dot-1">1</div>
+              <div class="p-wire"></div>
+            </div>
+            <div class="p-body">
+              <div class="p-name">Push Code</div>
+              <div class="p-msg" id="d-st-1">&mdash;</div>
             </div>
           </div>
-          <div class="d-conn"></div>
 
-          <div class="d-step">
-            <div class="d-dot" id="d-dot-2"></div>
-            <div class="d-body">
-              <div class="d-label">
-                <span class="d-num">Step 2</span>
-                <span class="d-name">CI Runs</span>
-              </div>
-              <div class="d-st" id="d-st-2">&mdash;</div>
-              <div class="d-subs">
-                <div class="d-sub">
+          <div class="p-step">
+            <div class="p-track">
+              <div class="p-node" id="d-dot-2">2</div>
+              <div class="p-wire"></div>
+            </div>
+            <div class="p-body">
+              <div class="p-name">CI Checks</div>
+              <div class="p-msg" id="d-st-2">&mdash;</div>
+              <div class="sub-steps">
+                <div class="sub-step">
                   <div class="s-dot" id="s-dot-flake8"></div>
-                  <span class="s-name">flake8 lint</span>
+                  <span class="s-label">flake8</span>
                   <span class="s-res" id="s-res-flake8">&mdash;</span>
                 </div>
-                <div class="d-sub">
+                <div class="sub-step">
                   <div class="s-dot" id="s-dot-black"></div>
-                  <span class="s-name">black format</span>
+                  <span class="s-label">black</span>
                   <span class="s-res" id="s-res-black">&mdash;</span>
                 </div>
-                <div class="d-sub">
+                <div class="sub-step">
                   <div class="s-dot" id="s-dot-pytest"></div>
-                  <span class="s-name">pytest</span>
+                  <span class="s-label">pytest</span>
                   <span class="s-res" id="s-res-pytest">&mdash;</span>
                 </div>
               </div>
             </div>
           </div>
-          <div class="d-conn"></div>
 
-          <div class="d-step">
-            <div class="d-dot" id="d-dot-3"></div>
-            <div class="d-body">
-              <div class="d-label">
-                <span class="d-num">Step 3</span>
-                <span class="d-name">Branch Protection</span>
-              </div>
-              <div class="d-st" id="d-st-3">&mdash;</div>
+          <div class="p-step">
+            <div class="p-track">
+              <div class="p-node" id="d-dot-3">3</div>
+              <div class="p-wire"></div>
+            </div>
+            <div class="p-body">
+              <div class="p-name">Merge Gate</div>
+              <div class="p-msg" id="d-st-3">&mdash;</div>
             </div>
           </div>
-          <div class="d-conn"></div>
 
-          <div class="d-step">
-            <div class="d-dot locked"></div>
-            <div class="d-body">
-              <div class="d-label">
-                <span class="d-num">Step 4</span>
-                <span class="d-name">CD Deploy</span>
-              </div>
-              <div class="d-st lock">
-                &#x1F512; only on merge to main
-              </div>
+          <div class="p-step">
+            <div class="p-track">
+              <div class="p-node locked">4</div>
+              <div class="p-wire"></div>
+            </div>
+            <div class="p-body">
+              <div class="p-name">Deploy</div>
+              <div class="p-msg lock">on merge to main</div>
             </div>
           </div>
-          <div class="d-conn"></div>
 
-          <div class="d-step">
-            <div class="d-dot locked"></div>
-            <div class="d-body">
-              <div class="d-label">
-                <span class="d-num">Step 5</span>
-                <span class="d-name">Health Check</span>
-              </div>
-              <div class="d-st lock">
-                &#x1F512; only on merge to main
-              </div>
+          <div class="p-step">
+            <div class="p-track">
+              <div class="p-node locked">5</div>
+            </div>
+            <div class="p-body">
+              <div class="p-name">Health Check</div>
+              <div class="p-msg lock">on merge to main</div>
             </div>
           </div>
 
         </div>
       </div>
+    </div>
 
-      <!-- RIGHT: Log panel -->
-      <div class="log-panel">
-        <div class="log-header">
-          <span class="log-title">GitHub Actions Log</span>
-          <a class="gh-link" id="gh-link" href="#"
-             target="_blank" style="display:none">
-            View on GitHub &rarr;
-          </a>
-        </div>
-        <div class="log-body" id="log-body">
-          <div class="log-placeholder">Run the demo to see live logs</div>
+    <!-- Right: log panel -->
+    <div class="panel log-panel">
+      <div class="log-titlebar">
+        <div class="tl tl-r"></div>
+        <div class="tl tl-y"></div>
+        <div class="tl tl-g"></div>
+        <span class="titlebar-label">github-actions &mdash; test</span>
+        <a class="gh-link" id="gh-link" href="#"
+           target="_blank" style="display:none">open &#x2197;</a>
+      </div>
+      <div class="log-body" id="log-body">
+        <div class="log-empty">
+          <div class="log-empty-glyph">&#x25A1;</div>
+          <span>waiting for run&hellip;</span>
         </div>
       </div>
-
     </div>
 
-    <div class="links">
-      <a href="https://github.com/ss-bae/cicd-demo" target="_blank">
-        GitHub Repo &rarr;
-      </a>
-    </div>
   </div>
 
-  <script>
-    let pollTimer = null;
-    let currentBranch = null;
+  <div class="foot">
+    <a class="foot-link"
+       href="https://github.com/ss-bae/cicd-demo"
+       target="_blank">GitHub &rarr;</a>
+  </div>
+</div>
 
-    async function runDemo() {
-      const btn = document.getElementById('run-btn');
-      btn.disabled = true;
-      clearInterval(pollTimer);
-      reset();
-      setStep(1, 'running', 'pushing branch...');
-      try {
-        const res = await fetch('/demo/trigger', { method: 'POST' });
-        const data = await res.json();
-        if (data.error) {
-          setStep(1, 'failure', data.error);
-          btn.disabled = false;
-          return;
-        }
-        currentBranch = data.branch;
-        setStep(1, 'success', 'branch created \u2713');
-        setStep(2, 'running', 'waiting for runner...');
-        pollTimer = setInterval(poll, 3000);
-      } catch (e) {
-        setStep(1, 'failure', 'network error');
+<script>
+  let pollTimer = null;
+  let currentBranch = null;
+
+  async function runDemo() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    clearInterval(pollTimer);
+    reset();
+    setStep(1, 'running', 'creating branch\u2026');
+    try {
+      const res = await fetch('/demo/trigger', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) {
+        setStep(1, 'failure', data.error);
         btn.disabled = false;
-      }
-    }
-
-    async function poll() {
-      if (!currentBranch) return;
-      try {
-        const res = await fetch('/demo/status/' + currentBranch);
-        const data = await res.json();
-        apply(data);
-        if (data.phase === 'completed' || data.branch_deleted) {
-          clearInterval(pollTimer);
-          document.getElementById('run-btn').disabled = false;
-        }
-      } catch (e) { /* keep polling */ }
-    }
-
-    const STEP_MAP = {
-      'Lint with flake8': 'flake8',
-      'Check formatting with black': 'black',
-      'Run tests with coverage': 'pytest',
-    };
-
-    function apply(data) {
-      if (data.phase === 'pending') {
-        setStep(2, 'running', 'waiting for runner...');
         return;
       }
-      if (data.run_url) {
-        const lnk = document.getElementById('gh-link');
-        lnk.href = data.run_url;
-        lnk.style.display = '';
-      }
-      if (data.steps) {
-        updateLogPanel(data.steps);
-      }
-      for (const [name, key] of Object.entries(STEP_MAP)) {
-        const s = data.steps[name];
-        if (!s) continue;
-        const state = s.conclusion === 'success' ? 'ok'
-          : s.conclusion === 'failure' ? 'fail'
-          : s.status === 'in_progress' ? 'run' : '';
-        const label = s.conclusion === 'success' ? '\u2713'
-          : s.conclusion === 'failure' ? '\u2717'
-          : s.status === 'in_progress' ? '...' : '\u2014';
-        setSub(key, state, label);
-      }
-      if (data.phase === 'in_progress') {
-        setStep(2, 'running', 'running checks...');
-      } else if (data.phase === 'completed') {
-        if (data.conclusion === 'success') {
-          setStep(2, 'success', 'all checks passed \u2713');
-          setStep(3, 'success', 'CI passed \u2014 merge unblocked \u2713');
-        } else {
-          setStep(2, 'failure', 'a check failed \u2717');
-          setStep(3, 'failure', 'CI failed \u2014 merge blocked \u2717');
-        }
-      }
+      currentBranch = data.branch;
+      setStep(1, 'success', 'branch pushed \u2713');
+      setStep(2, 'running', 'waiting for runner\u2026');
+      pollTimer = setInterval(poll, 3000);
+    } catch (e) {
+      setStep(1, 'failure', 'network error');
+      btn.disabled = false;
     }
+  }
 
-    function updateLogPanel(steps) {
-      const logBody = document.getElementById('log-body');
-      logBody.innerHTML = '';
-      for (const [name, step] of Object.entries(steps)) {
-        const state = step.conclusion === 'success' ? 'ok'
-          : step.conclusion === 'failure' ? 'fail'
-          : step.status === 'in_progress' ? 'run' : 'queued';
-        const icon = state === 'ok' ? '\u2713'
-          : state === 'fail' ? '\u2717'
-          : state === 'run' ? '\u25b6' : '\u25cb';
-        const row = document.createElement('div');
-        row.className = 'log-row';
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'log-icon ' + state;
-        iconSpan.textContent = icon;
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'log-name ' + state;
-        nameSpan.textContent = name;
-        row.appendChild(iconSpan);
-        row.appendChild(nameSpan);
-        logBody.appendChild(row);
+  async function poll() {
+    if (!currentBranch) return;
+    try {
+      const res = await fetch('/demo/status/' + currentBranch);
+      const data = await res.json();
+      apply(data);
+      if (data.phase === 'completed' || data.branch_deleted) {
+        clearInterval(pollTimer);
+        document.getElementById('run-btn').disabled = false;
       }
-    }
+    } catch (e) { /* keep polling */ }
+  }
 
-    function setStep(n, state, text) {
-      const dot = document.getElementById('d-dot-' + n);
-      const st = document.getElementById('d-st-' + n);
-      dot.className = 'd-dot ' + state;
-      st.textContent = text;
-      st.className = 'd-st'
-        + (state === 'success' ? ' ok'
-          : state === 'failure' ? ' fail'
-          : state === 'running' ? ' run' : '');
-    }
+  const STEP_MAP = {
+    'Lint with flake8': 'flake8',
+    'Check formatting with black': 'black',
+    'Run tests with coverage': 'pytest',
+  };
 
-    function setSub(key, state, label) {
-      const dot = document.getElementById('s-dot-' + key);
-      const res = document.getElementById('s-res-' + key);
-      dot.className = 's-dot ' + state;
-      res.textContent = label;
-      res.className = 's-res ' + state;
+  function apply(data) {
+    if (data.phase === 'pending') {
+      setStep(2, 'running', 'waiting for runner\u2026');
+      return;
     }
-
-    function reset() {
-      for (let i = 1; i <= 3; i++) {
-        setStep(i, '', '\u2014');
-      }
-      ['flake8', 'black', 'pytest'].forEach(k => setSub(k, '', '\u2014'));
+    if (data.run_url) {
       const lnk = document.getElementById('gh-link');
-      lnk.style.display = 'none';
-      lnk.href = '#';
-      const logBody = document.getElementById('log-body');
-      logBody.innerHTML =
-        '<div class="log-placeholder">Run the demo to see live logs</div>';
+      lnk.href = data.run_url;
+      lnk.style.display = '';
     }
-  </script>
+    if (data.steps) updateLog(data.steps);
+    for (const [name, key] of Object.entries(STEP_MAP)) {
+      const s = data.steps[name];
+      if (!s) continue;
+      const st = s.conclusion === 'success' ? 'ok'
+        : s.conclusion === 'failure' ? 'fail'
+        : s.status === 'in_progress' ? 'run' : '';
+      const lb = s.conclusion === 'success' ? '\u2713'
+        : s.conclusion === 'failure' ? '\u2717'
+        : s.status === 'in_progress' ? '\u2026' : '\u2014';
+      setSub(key, st, lb);
+    }
+    if (data.phase === 'in_progress') {
+      setStep(2, 'running', 'running checks\u2026');
+    } else if (data.phase === 'completed') {
+      if (data.conclusion === 'success') {
+        setStep(2, 'success', 'all checks passed \u2713');
+        setStep(3, 'success', 'merge unblocked \u2713');
+      } else {
+        setStep(2, 'failure', 'a check failed \u2717');
+        setStep(3, 'failure', 'merge blocked \u2717');
+      }
+    }
+  }
+
+  function updateLog(steps) {
+    const body = document.getElementById('log-body');
+    body.innerHTML = '';
+    let n = 1;
+    for (const [name, step] of Object.entries(steps)) {
+      const st = step.conclusion === 'success' ? 'ok'
+        : step.conclusion === 'failure' ? 'fail'
+        : step.status === 'in_progress' ? 'run' : 'queued';
+      const ic = st === 'ok' ? '\u2713'
+        : st === 'fail' ? '\u2717'
+        : st === 'run' ? '\u25b6' : '\u25cb';
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      const lno = document.createElement('span');
+      lno.className = 'log-lno';
+      lno.textContent = n++;
+      const icon = document.createElement('span');
+      icon.className = 'log-ic ' + st;
+      icon.textContent = ic;
+      const txt = document.createElement('span');
+      txt.className = 'log-txt ' + st;
+      txt.textContent = name;
+      row.appendChild(lno);
+      row.appendChild(icon);
+      row.appendChild(txt);
+      body.appendChild(row);
+    }
+  }
+
+  function setStep(n, state, text) {
+    const node = document.getElementById('d-dot-' + n);
+    const msg = document.getElementById('d-st-' + n);
+    node.className = 'p-node ' + state;
+    node.textContent = state === 'success' ? '\u2713'
+      : state === 'failure' ? '\u2717' : n;
+    msg.textContent = text;
+    msg.className = 'p-msg'
+      + (state === 'success' ? ' ok'
+        : state === 'failure' ? ' fail'
+        : state === 'running' ? ' run' : '');
+  }
+
+  function setSub(key, state, label) {
+    const dot = document.getElementById('s-dot-' + key);
+    const res = document.getElementById('s-res-' + key);
+    dot.className = 's-dot ' + state;
+    res.textContent = label;
+    res.className = 's-res ' + state;
+  }
+
+  function reset() {
+    for (let i = 1; i <= 3; i++) {
+      const node = document.getElementById('d-dot-' + i);
+      const msg = document.getElementById('d-st-' + i);
+      node.className = 'p-node';
+      node.textContent = i;
+      msg.textContent = '\u2014';
+      msg.className = 'p-msg';
+    }
+    ['flake8', 'black', 'pytest'].forEach(k => setSub(k, '', '\u2014'));
+    const lnk = document.getElementById('gh-link');
+    lnk.style.display = 'none';
+    lnk.href = '#';
+    document.getElementById('log-body').innerHTML =
+      '<div class="log-empty">'
+      + '<div class="log-empty-glyph">\u25a1</div>'
+      + '<span>waiting for run\u2026</span>'
+      + '</div>';
+  }
+</script>
 </body>
 </html>"""
 
