@@ -263,13 +263,37 @@ INDEX_HTML = """<!DOCTYPE html>
     .s-res.fail { color: #f85149; }
     .s-res.run { color: #58a6ff; }
     .gh-link {
-      font-size: .8rem; color: #58a6ff;
-      text-decoration: none; text-align: center;
+      font-size: .75rem; color: #58a6ff;
+      text-decoration: none;
     }
     .gh-link:hover { text-decoration: underline; }
     .links { display: flex; gap: 16px; justify-content: center; }
     .links a { color: #58a6ff; font-size: .85rem; text-decoration: none; }
     .links a:hover { text-decoration: underline; }
+    /* Log panel */
+    .log-panel {
+      background: #0d1117; border: 1px solid #21262d;
+      border-radius: 12px; overflow: hidden;
+      display: flex; flex-direction: column; min-height: 420px;
+    }
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: #161b22;
+      border-bottom: 1px solid #21262d; flex-shrink: 0;
+    }
+    .log-title { font-size: .78rem; font-weight: 600; color: #8b949e; letter-spacing: .04em; }
+    .log-body { flex: 1; padding: 6px 0; overflow-y: auto; font-family: 'SF Mono', Consolas, 'Liberation Mono', monospace; }
+    .log-placeholder { padding: 48px 16px; text-align: center; color: #484f58; font-size: .85rem; font-family: -apple-system, sans-serif; }
+    .log-row { display: flex; align-items: center; gap: 10px; padding: 3px 16px; font-size: .78rem; line-height: 1.7; cursor: default; }
+    .log-row:hover { background: #161b22; }
+    .log-icon { width: 14px; flex-shrink: 0; text-align: center; font-size: .75rem; }
+    .log-icon.ok { color: #56d364; }
+    .log-icon.fail { color: #f85149; }
+    .log-icon.run { color: #58a6ff; }
+    .log-icon.queued { color: #484f58; }
+    .log-name { flex: 1; color: #8b949e; }
+    .log-name.run { color: #e6edf3; font-weight: 600; }
+    .log-name.fail { color: #f85149; }
     @media (max-width: 700px) {
       .main-layout { grid-template-columns: 1fr; }
     }
@@ -289,99 +313,7 @@ INDEX_HTML = """<!DOCTYPE html>
 
     <div class="main-layout">
 
-      <!-- LEFT: Steps 1-5 -->
-      <div>
-        <div class="step dev">
-          <div class="step-left">
-            <div class="step-icon">&#x270F;</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-body">
-            <div class="step-title">1. Developer pushes code</div>
-            <div class="step-desc">
-              A change is committed and pushed to GitHub on any branch,
-              or a pull request is opened targeting <code>main</code>.
-            </div>
-            <div class="step-tags">
-              <span class="tag">git push</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="step ci">
-          <div class="step-left">
-            <div class="step-icon">&#x2699;</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-body">
-            <div class="step-title">2. CI runs automatically</div>
-            <div class="step-desc">
-              GitHub Actions spins up a fresh Ubuntu VM and runs three
-              quality gates. If any step fails the PR is blocked.
-            </div>
-            <div class="step-tags">
-              <span class="tag">flake8</span>
-              <span class="tag">black --check</span>
-              <span class="tag">pytest --cov</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="step ci">
-          <div class="step-left">
-            <div class="step-icon">&#x1F512;</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-body">
-            <div class="step-title">3. Branch protection gates merge</div>
-            <div class="step-desc">
-              The <code>main</code> branch requires the CI
-              <code>test</code> job to pass before any PR can merge.
-            </div>
-            <div class="step-tags">
-              <span class="tag">branch protection</span>
-              <span class="tag">required status checks</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="step cd">
-          <div class="step-left">
-            <div class="step-icon">&#x1F680;</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-body">
-            <div class="step-title">4. Merge to main triggers CD</div>
-            <div class="step-desc">
-              A separate CD workflow fires only on pushes to
-              <code>main</code> and sends a deploy webhook to Render.
-            </div>
-            <div class="step-tags">
-              <span class="tag">cd.yml</span>
-              <span class="tag">render webhook</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="step live">
-          <div class="step-left">
-            <div class="step-icon">&#x2665;</div>
-          </div>
-          <div class="step-body">
-            <div class="step-title">5. Health check confirms deploy</div>
-            <div class="step-desc">
-              The CD workflow polls <code>/health</code> every 15s
-              for up to 5 minutes. Once healthy, pipeline is green.
-            </div>
-            <div class="step-tags">
-              <span class="tag">curl --fail /health</span>
-              <span class="tag">retry loop</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT: Live demo panel -->
+      <!-- LEFT: Demo panel -->
       <div class="demo-panel">
         <button class="run-btn" id="run-btn" onclick="runDemo()">
           &#x25B6;&nbsp; Run Pipeline Demo
@@ -470,11 +402,20 @@ INDEX_HTML = """<!DOCTYPE html>
           </div>
 
         </div>
+      </div>
 
-        <a class="gh-link" id="gh-link" href="#"
-           target="_blank" style="display:none">
-          View on GitHub Actions &rarr;
-        </a>
+      <!-- RIGHT: Log panel -->
+      <div class="log-panel">
+        <div class="log-header">
+          <span class="log-title">GitHub Actions Log</span>
+          <a class="gh-link" id="gh-link" href="#"
+             target="_blank" style="display:none">
+            View on GitHub &rarr;
+          </a>
+        </div>
+        <div class="log-body" id="log-body">
+          <div class="log-placeholder">Run the demo to see live logs</div>
+        </div>
       </div>
 
     </div>
@@ -543,6 +484,9 @@ INDEX_HTML = """<!DOCTYPE html>
         lnk.href = data.run_url;
         lnk.style.display = '';
       }
+      if (data.steps) {
+        updateLogPanel(data.steps);
+      }
       for (const [name, key] of Object.entries(STEP_MAP)) {
         const s = data.steps[name];
         if (!s) continue;
@@ -564,6 +508,30 @@ INDEX_HTML = """<!DOCTYPE html>
           setStep(2, 'failure', 'a check failed \u2717');
           setStep(3, 'failure', 'CI failed \u2014 merge blocked \u2717');
         }
+      }
+    }
+
+    function updateLogPanel(steps) {
+      const logBody = document.getElementById('log-body');
+      logBody.innerHTML = '';
+      for (const [name, step] of Object.entries(steps)) {
+        const state = step.conclusion === 'success' ? 'ok'
+          : step.conclusion === 'failure' ? 'fail'
+          : step.status === 'in_progress' ? 'run' : 'queued';
+        const icon = state === 'ok' ? '\u2713'
+          : state === 'fail' ? '\u2717'
+          : state === 'run' ? '\u25b6' : '\u25cb';
+        const row = document.createElement('div');
+        row.className = 'log-row';
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'log-icon ' + state;
+        iconSpan.textContent = icon;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'log-name ' + state;
+        nameSpan.textContent = name;
+        row.appendChild(iconSpan);
+        row.appendChild(nameSpan);
+        logBody.appendChild(row);
       }
     }
 
@@ -594,6 +562,8 @@ INDEX_HTML = """<!DOCTYPE html>
       const lnk = document.getElementById('gh-link');
       lnk.style.display = 'none';
       lnk.href = '#';
+      const logBody = document.getElementById('log-body');
+      logBody.innerHTML = '<div class="log-placeholder">Run the demo to see live logs</div>';
     }
   </script>
 </body>
