@@ -151,6 +151,17 @@ INDEX_HTML = """<!DOCTYPE html>
       --green:   #10b981;
       --red:     #ef4444;
     }
+    [data-theme="light"] {
+      --bg:      #f4ede0;
+      --surface: #ede5d5;
+      --border:  rgba(100,80,60,.12);
+      --text:    #2c1f0f;
+      --muted:   #7a6450;
+      --dim:     #b09880;
+      --blue:    #1d4ed8;
+      --green:   #059669;
+      --red:     #dc2626;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont,
         'Segoe UI', system-ui, sans-serif;
@@ -426,6 +437,54 @@ INDEX_HTML = """<!DOCTYPE html>
     }
     .foot-link:hover { color: var(--muted); }
 
+    /* Theme toggle button */
+    .theme-toggle {
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      padding: 4px 8px; color: var(--muted);
+      font-size: .8rem; font-family: inherit;
+      display: flex; align-items: center; gap: 5px;
+      transition: all .15s;
+    }
+    .theme-toggle:hover { color: var(--text); background: var(--border); }
+
+    /* Light mode hardcoded overrides */
+    [data-theme="light"] nav {
+      background: rgba(244,237,224,.92);
+    }
+    [data-theme="light"] h1 { color: #1a0f05; }
+    [data-theme="light"] .p-name { color: #3d2a18; }
+    [data-theme="light"] .p-msg.lock { color: #c4b09a; }
+    [data-theme="light"] .p-node { background: var(--bg); }
+    [data-theme="light"] .p-node.success {
+      border-color: #065f46; background: #d1fae5; color: #059669;
+    }
+    [data-theme="light"] .p-node.failure {
+      border-color: #7f1d1d; background: #fee2e2; color: #dc2626;
+    }
+    [data-theme="light"] .p-node.running {
+      border-color: #1d4ed8; background: #dbeafe; color: #1d4ed8;
+    }
+    [data-theme="light"] .p-node.locked {
+      border-color: #d4c4b0; color: #d4c4b0;
+    }
+    [data-theme="light"] .run-btn:disabled {
+      background: #ddd5c8; color: #b09880;
+    }
+    [data-theme="light"] .log-panel { background: #e8dece; }
+    [data-theme="light"] .log-titlebar {
+      background: #ddd2c0; border-bottom-color: rgba(100,80,60,.12);
+    }
+    [data-theme="light"] .titlebar-label { color: #9a8470; }
+    [data-theme="light"] .gh-link { color: #9a8470; }
+    [data-theme="light"] .log-lno { color: #c4b09a; }
+    [data-theme="light"] .log-txt { color: #5c4a38; }
+    [data-theme="light"] .log-txt.run { color: #2c1f0f; }
+    [data-theme="light"] .log-txt.fail { color: #9f1239; }
+    [data-theme="light"] .log-row:hover { background: rgba(0,0,0,.03); }
+    [data-theme="light"] .log-empty { color: #c4b09a; }
+    [data-theme="light"] .log-ic.queued { color: #c4b09a; }
+
     @media (max-width: 720px) {
       .grid { grid-template-columns: 1fr; }
       h1 { font-size: 1.5rem; }
@@ -447,6 +506,10 @@ INDEX_HTML = """<!DOCTYPE html>
   <a class="nav-link"
      href="https://github.com/ss-bae/cicd-demo"
      target="_blank">GitHub</a>
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+    <span id="theme-icon">&#9788;</span>
+    <span id="theme-label">Light</span>
+  </button>
 </nav>
 
 <div class="page">
@@ -576,6 +639,34 @@ INDEX_HTML = """<!DOCTYPE html>
 </div>
 
 <script>
+  // Theme toggle
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    applyTheme(saved);
+  })();
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if (icon && label) {
+      if (theme === 'light') {
+        icon.textContent = '\u263D';
+        label.textContent = 'Dark';
+      } else {
+        icon.innerHTML = '&#9788;';
+        label.textContent = 'Light';
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    applyTheme(next);
+  }
+
   let pollTimer = null;
   let currentBranch = null;
 
