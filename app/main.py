@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import threading
 import time
 from urllib.error import HTTPError
 from urllib.parse import quote
@@ -11,6 +12,10 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 items = []
+
+_visitors = {}
+_visitors_lock = threading.Lock()
+VISITOR_TTL = 30
 
 REPO = "ss-bae/cicd-demo"
 GH_API = "https://api.github.com"
@@ -130,6 +135,21 @@ def demo_status(branch):
     )
 
 
+@app.route("/demo/ping", methods=["POST"])
+def demo_ping():
+    sid = (request.json or {}).get("sid", "")
+    now = time.time()
+    with _visitors_lock:
+        if sid:
+            _visitors[sid] = now
+        cutoff = now - VISITOR_TTL
+        stale = [k for k, v in _visitors.items() if v < cutoff]
+        for k in stale:
+            del _visitors[k]
+        count = len(_visitors)
+    return jsonify({"users": count})
+
+
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -207,6 +227,15 @@ INDEX_HTML = """<!DOCTYPE html>
       padding: 4px 8px; border-radius: 6px; transition: all .15s;
     }
     .nav-link:hover { color: var(--text); background: var(--border); }
+    .nav-users {
+      display: flex; align-items: center; gap: 5px;
+      font-size: .75rem; color: var(--muted); font-weight: 500;
+    }
+    .users-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #a78bfa; flex-shrink: 0;
+      animation: breathe 3s ease-in-out infinite;
+    }
 
     /* Page */
     .page {
@@ -375,12 +404,6 @@ INDEX_HTML = """<!DOCTYPE html>
       background: #0f1623;
       border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
-    .tl {
-      width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
-    }
-    .tl-r { background: #ff5f57; }
-    .tl-y { background: #febc2e; }
-    .tl-g { background: #28c840; }
     .titlebar-label {
       flex: 1; text-align: center; font-size: .7rem; color: #2d3748;
     }
@@ -503,6 +526,10 @@ INDEX_HTML = """<!DOCTYPE html>
     <div class="nav-pip"></div>
     <span>all systems operational</span>
   </div>
+  <div class="nav-users" id="nav-users" title="Live viewers">
+    <span class="users-dot"></span>
+    <span id="users-count">1</span>
+  </div>
   <a class="nav-link"
      href="https://github.com/ss-bae/cicd-demo"
      target="_blank">GitHub</a>
@@ -614,9 +641,6 @@ INDEX_HTML = """<!DOCTYPE html>
     <!-- Right: log panel -->
     <div class="panel log-panel">
       <div class="log-titlebar">
-        <div class="tl tl-r"></div>
-        <div class="tl tl-y"></div>
-        <div class="tl tl-g"></div>
         <span class="titlebar-label">github-actions &mdash; test</span>
         <a class="gh-link" id="gh-link" href="#"
            target="_blank" style="display:none">open &#x2197;</a>
@@ -666,6 +690,22 @@ INDEX_HTML = """<!DOCTYPE html>
     localStorage.setItem('theme', next);
     applyTheme(next);
   }
+
+  // Live user count
+  const _sid = Math.random().toString(36).slice(2);
+  async function pingPresence() {
+    try {
+      const r = await fetch('/demo/ping', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sid: _sid})
+      });
+      const d = await r.json();
+      document.getElementById('users-count').textContent = d.users;
+    } catch(_) {}
+  }
+  pingPresence();
+  setInterval(pingPresence, 15000);
 
   let pollTimer = null;
   let currentBranch = null;
